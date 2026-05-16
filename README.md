@@ -192,6 +192,6 @@ After generating your plan, you can ask follow-up questions. The assistant searc
 
 ## Built By
 
-**Shreyas J Rao** — Internship Capstone Project
+**Shreyas J ** — Internship Capstone Project
 
 > Built from scratch over 6 weeks using Python, Scikit-learn, FAISS, Sentence Transformers, Streamlit, and Railway.
