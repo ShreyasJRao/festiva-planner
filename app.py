@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
-from functools import lru_cache
+import io
 
 st.set_page_config(page_title="Festiva Planner AI", page_icon="🎉", layout="wide")
 
@@ -33,6 +33,9 @@ st.markdown("""
 .check-text { color: #94a3b8; font-size: 14px; line-height: 1.5; padding-top: 2px; }
 .tip-card { background: #0a0a0f; border-left: 3px solid #7c3aed; border-radius: 0 10px 10px 0; padding: 14px 16px; margin-bottom: 10px; color: #94a3b8; font-size: 13px; line-height: 1.7; }
 .warning-box { background: #1a1200; border: 1px solid #854d0e; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; color: #fbbf24; font-size: 14px; line-height: 1.6; }
+.chat-user { background: #1a1a2e; border-radius: 12px 12px 4px 12px; padding: 10px 16px; margin-bottom: 8px; color: #e2e8f0; font-size: 14px; text-align: right; display: inline-block; float: right; clear: both; max-width: 70%; }
+.chat-wrap { overflow: hidden; margin-bottom: 8px; }
+.chat-bot { background: #0a0a0f; border-left: 3px solid #7c3aed; border-radius: 0 12px 12px 12px; padding: 12px 16px; margin-bottom: 8px; color: #94a3b8; font-size: 13px; line-height: 1.6; max-width: 85%; clear: both; }
 .stButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 16px 28px !important; font-size: 16px !important; font-weight: 600 !important; width: 100% !important; }
 .reset-btn > button { background: #111118 !important; color: #94a3b8 !important; border: 1px solid #1e1e2e !important; border-radius: 12px !important; padding: 12px 28px !important; font-size: 14px !important; width: 100% !important; }
 div[data-testid="stSelectbox"] > div, div[data-testid="stNumberInput"] > div > div, div[data-testid="stTextInput"] > div > div { background: #0a0a0f !important; border-color: #1e1e2e !important; color: #e2e8f0 !important; border-radius: 10px !important; }
@@ -128,6 +131,7 @@ def load_models():
     embed_model = SentenceTransformer('all-MiniLM-L6-v2',
                   cache_folder=os.path.join(base, 'models', 'sentence_transformer_cache'))
     return nlp_model, vectorizer, index, embed_model
+
 # ── PLANNING LOGIC ────────────────────────────────────────
 def generate_plan(event_type, city, guest_count, duration_days, season, outdoor, user_budget):
     _, _, index, embed_model = load_models()
@@ -136,10 +140,10 @@ def generate_plan(event_type, city, guest_count, duration_days, season, outdoor,
 
     warning = None
     if user_budget < min_required * 0.5:
-        warning = f"Your budget of ₹{user_budget:,} is very low for {guest_count} guests in {city}. Minimum recommended is ₹{int(min_required):,}. Plan adjusted to minimum viable budget."
+        warning = f"Your budget of Rs.{user_budget:,} is very low for {guest_count} guests in {city}. Minimum recommended is Rs.{int(min_required):,}. Plan adjusted to minimum viable budget."
         working_budget = int(min_required * 0.5)
     elif user_budget < min_required:
-        warning = f"Your budget of ₹{user_budget:,} is a bit tight for {guest_count} guests in {city}. We recommend at least ₹{int(min_required):,}. We've created the best plan within your budget."
+        warning = f"Your budget of Rs.{user_budget:,} is a bit tight for {guest_count} guests in {city}. We recommend at least Rs.{int(min_required):,}. We have created the best plan within your budget."
         working_budget = user_budget
     else:
         working_budget = user_budget
@@ -162,6 +166,100 @@ def generate_plan(event_type, city, guest_count, duration_days, season, outdoor,
         'tips': tips,
     }
 
+# ── AI ASSISTANT ──────────────────────────────────────────
+def ask_assistant(question, event_type=None):
+    _, _, index, embed_model = load_models()
+    query = f"{event_type} {question}" if event_type else question
+    query_vector = embed_model.encode([query])
+    distances, indices = index.search(np.array(query_vector), 3)
+    relevant = [KNOWLEDGE_BASE[i] for i in indices[0]]
+    answer = "Based on event planning best practices:\n\n"
+    for i, tip in enumerate(relevant, 1):
+        answer += f"{i}. {tip}\n\n"
+    return answer
+
+# ── PDF EXPORT ────────────────────────────────────────────
+def generate_pdf(d):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.units import cm
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm,
+                            leftMargin=2*cm, rightMargin=2*cm)
+    styles = getSampleStyleSheet()
+    purple = colors.HexColor('#7c3aed')
+    dark = colors.HexColor('#1a1a2e')
+
+    title_style = ParagraphStyle('title', parent=styles['Title'],
+        fontSize=24, textColor=purple, spaceAfter=6)
+    head_style = ParagraphStyle('head', parent=styles['Heading2'],
+        fontSize=13, textColor=purple, spaceBefore=16, spaceAfter=6)
+    body_style = ParagraphStyle('body', parent=styles['Normal'],
+        fontSize=10, textColor=colors.HexColor('#334155'), spaceAfter=4)
+
+    story = []
+    story.append(Paragraph("Festiva Planner AI", title_style))
+    story.append(Paragraph(f"Event Plan — {d['event_type']}", styles['Heading3']))
+    story.append(Spacer(1, 12))
+
+    # Summary table
+    summary_data = [
+        ['Event Type', d['event_type'], 'City', d['city']],
+        ['Guests', str(d['guest_count']), 'Duration', f"{d['duration_days']} day(s)"],
+        ['Your Budget', f"Rs.{d['user_budget']:,}", 'Working Budget', f"Rs.{d['working_budget']:,}"],
+    ]
+    t = Table(summary_data, colWidths=[4*cm, 5*cm, 4*cm, 5*cm])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8f7ff')),
+        ('TEXTCOLOR', (0,0), (0,-1), purple),
+        ('TEXTCOLOR', (2,0), (2,-1), purple),
+        ('FONTSIZE', (0,0), (-1,-1), 10),
+        ('ROWBACKGROUNDS', (0,0), (-1,-1), [colors.white, colors.HexColor('#f3f0ff')]),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 12))
+
+    # Budget breakdown
+    story.append(Paragraph("Budget Breakdown", head_style))
+    budget_data = [['Category', 'Amount', 'Percentage']]
+    for cat, amt in d['budget_breakdown'].items():
+        pct = f"{amt/d['working_budget']*100:.0f}%"
+        budget_data.append([cat, f"Rs.{amt:,}", pct])
+    bt = Table(budget_data, colWidths=[7*cm, 6*cm, 5*cm])
+    bt.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), purple),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTSIZE', (0,0), (-1,-1), 10),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#f3f0ff')]),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+        ('PADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(bt)
+
+    # Checklist
+    story.append(Paragraph("Event Checklist", head_style))
+    for i, item in enumerate(d['checklist'], 1):
+        story.append(Paragraph(f"{i}. {item}", body_style))
+
+    # Tips
+    story.append(Paragraph("Planning Tips", head_style))
+    for tip in d['tips']:
+        story.append(Paragraph(f"• {tip}", body_style))
+
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("Generated by Festiva Planner AI", 
+        ParagraphStyle('footer', parent=styles['Normal'], fontSize=8, 
+                       textColor=colors.HexColor('#94a3b8'), alignment=1)))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
 # ── SESSION STATE ─────────────────────────────────────────
 if 'selected_event' not in st.session_state:
     st.session_state.selected_event = None
@@ -169,6 +267,8 @@ if 'show_results' not in st.session_state:
     st.session_state.show_results = False
 if 'result_data' not in st.session_state:
     st.session_state.result_data = None
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
 
 # ── HERO ──────────────────────────────────────────────────
 st.markdown("""
@@ -209,7 +309,7 @@ if not st.session_state.show_results:
                 season = st.selectbox("Season", ["Winter","Summer","Monsoon"])
             with col3:
                 outdoor = st.selectbox("Venue type", ["Indoors","Outdoors"]) == "Outdoors"
-                user_budget = st.number_input("Your budget (₹)", min_value=10000, max_value=100000000, value=500000, step=10000)
+                user_budget = st.number_input("Your budget (Rs.)", min_value=10000, max_value=100000000, value=500000, step=10000)
             submitted = st.form_submit_button("✦ Generate my event plan")
 
         if submitted:
@@ -219,6 +319,7 @@ if not st.session_state.show_results:
                     guest_count, duration_days, season, outdoor, user_budget
                 )
                 st.session_state.result_data = result
+                st.session_state.chat_history = []
                 st.session_state.show_results = True
                 st.rerun()
 
@@ -229,13 +330,28 @@ if st.session_state.show_results and st.session_state.result_data:
     import plotly.graph_objects as go
     d = st.session_state.result_data
 
-    st.markdown('<div class="reset-btn">', unsafe_allow_html=True)
-    if st.button("↩ Plan a new event", key="reset"):
-        st.session_state.show_results = False
-        st.session_state.result_data = None
-        st.session_state.selected_event = None
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    col_reset, col_pdf = st.columns([3, 1])
+    with col_reset:
+        st.markdown('<div class="reset-btn">', unsafe_allow_html=True)
+        if st.button("↩ Plan a new event", key="reset"):
+            st.session_state.show_results = False
+            st.session_state.result_data = None
+            st.session_state.selected_event = None
+            st.session_state.chat_history = []
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col_pdf:
+        try:
+            pdf_buffer = generate_pdf(d)
+            st.download_button(
+                label="⬇ Download Plan as PDF",
+                data=pdf_buffer,
+                file_name=f"festiva_{d['event_type'].lower()}_plan.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        except Exception:
+            st.info("Install reportlab to enable PDF export")
 
     if d.get("warning"):
         st.markdown(f'<div class="warning-box">⚠️ {d["warning"]}</div>', unsafe_allow_html=True)
@@ -243,13 +359,13 @@ if st.session_state.show_results and st.session_state.result_data:
     st.markdown(f"""
     <div class="result-header">
         <div class="event-type-pill">✦ {d['event_type']}</div>
-        <div class="big-budget">₹{d['working_budget']:,}</div>
+        <div class="big-budget">Rs.{d['working_budget']:,}</div>
         <div class="budget-label">Your event budget</div>
         <div class="metric-row">
             <div class="metric-box"><div class="metric-val">{d['guest_count']}</div><div class="metric-lbl">Guests</div></div>
             <div class="metric-box"><div class="metric-val">{d['city']}</div><div class="metric-lbl">City</div></div>
             <div class="metric-box"><div class="metric-val">{d['duration_days']} day{'s' if d['duration_days']>1 else ''}</div><div class="metric-lbl">Duration</div></div>
-            <div class="metric-box"><div class="metric-val">₹{d['user_budget']:,}</div><div class="metric-lbl">Your input</div></div>
+            <div class="metric-box"><div class="metric-val">Rs.{d['user_budget']:,}</div><div class="metric-lbl">Your input</div></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -260,22 +376,22 @@ if st.session_state.show_results and st.session_state.result_data:
         st.markdown('<div class="section-card"><div class="section-head">Budget Breakdown</div>', unsafe_allow_html=True)
         labels = list(d['budget_breakdown'].keys())
         values = list(d['budget_breakdown'].values())
-        colors = ['#7c3aed','#a78bfa','#6d28d9','#4c1d95','#8b5cf6','#c4b5fd']
+        colors_list = ['#7c3aed','#a78bfa','#6d28d9','#4c1d95','#8b5cf6','#c4b5fd']
         fig = go.Figure(data=[go.Pie(
             labels=labels, values=values, hole=0.65,
-            marker=dict(colors=colors[:len(labels)], line=dict(color='#0a0a0f', width=2)),
+            marker=dict(colors=colors_list[:len(labels)], line=dict(color='#0a0a0f', width=2)),
             textinfo='label+percent',
             textfont=dict(color='#e2e8f0', size=12),
         )])
         fig.update_layout(
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
             showlegend=False, margin=dict(t=0,b=0,l=0,r=0), height=280,
-            annotations=[dict(text=f"₹{d['working_budget']:,}", x=0.5, y=0.5,
+            annotations=[dict(text=f"Rs.{d['working_budget']:,}", x=0.5, y=0.5,
                 font=dict(size=13, color='#a78bfa', family='Inter'), showarrow=False)]
         )
         st.plotly_chart(fig, use_container_width=True, key="budget_chart")
         for cat, amt in d['budget_breakdown'].items():
-            st.markdown(f'<div style="display:flex;justify-content:space-between;color:#64748b;font-size:13px;margin-bottom:4px"><span>{cat}</span><span style="color:#e2e8f0">₹{amt:,}</span></div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="display:flex;justify-content:space-between;color:#64748b;font-size:13px;margin-bottom:4px"><span>{cat}</span><span style="color:#e2e8f0">Rs.{amt:,}</span></div>', unsafe_allow_html=True)
             st.progress(amt / d['working_budget'])
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -289,3 +405,29 @@ if st.session_state.show_results and st.session_state.result_data:
         for tip in d['tips']:
             st.markdown(f'<div class="tip-card">{tip}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── AI ASSISTANT ──────────────────────────────────────
+    st.markdown('<div class="section-card"><div class="section-head">AI Planning Assistant</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#64748b;font-size:13px;margin-bottom:16px">Ask me anything about your event — I will find the best answer from our knowledge base.</div>', unsafe_allow_html=True)
+
+    for msg in st.session_state.chat_history:
+        if msg['role'] == 'user':
+            st.markdown(f'<div class="chat-wrap"><div class="chat-user">{msg["content"]}</div></div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="chat-wrap"><div class="chat-bot">{msg["content"]}</div></div>', unsafe_allow_html=True)
+
+    with st.form("chat_form", clear_on_submit=True):
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            user_question = st.text_input("", placeholder="e.g. What vendors do I need? How far in advance should I book?")
+        with col2:
+            st.markdown("<br/>", unsafe_allow_html=True)
+            ask = st.form_submit_button("Ask →")
+
+    if ask and user_question:
+        answer = ask_assistant(user_question, d['event_type'])
+        st.session_state.chat_history.append({'role': 'user', 'content': user_question})
+        st.session_state.chat_history.append({'role': 'assistant', 'content': answer})
+        st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
