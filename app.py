@@ -36,9 +36,10 @@ st.markdown("""
 .chat-user { background: #1a1a2e; border-radius: 12px 12px 4px 12px; padding: 10px 16px; margin-bottom: 8px; color: #e2e8f0; font-size: 14px; text-align: right; display: inline-block; float: right; clear: both; max-width: 70%; }
 .chat-wrap { overflow: hidden; margin-bottom: 8px; }
 .chat-bot { background: #0a0a0f; border-left: 3px solid #7c3aed; border-radius: 0 12px 12px 12px; padding: 12px 16px; margin-bottom: 8px; color: #94a3b8; font-size: 13px; line-height: 1.6; max-width: 85%; clear: both; }
-.stButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 16px 28px !important; font-size: 16px !important; font-weight: 600 !important; width: 100% !important; }
-.stDownloadButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 16px 28px !important; font-size: 16px !important; font-weight: 600 !important; width: 100% !important; }
-.reset-btn > button { background: #111118 !important; color: #94a3b8 !important; border: 1px solid #1e1e2e !important; border-radius: 12px !important; padding: 12px 28px !important; font-size: 14px !important; width: 100% !important; }
+.stButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 10px !important; padding: 10px 20px !important; font-size: 14px !important; font-weight: 500 !important; width: 100% !important; }
+.stDownloadButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 10px !important; padding: 10px 20px !important; font-size: 14px !important; font-weight: 500 !important; width: 100% !important; }
+.reset-btn > button { background: #111118 !important; color: #94a3b8 !important; border: 1px solid #1e1e2e !important; border-radius: 10px !important; padding: 10px 20px !important; font-size: 13px !important; width: 100% !important; }
+.generate-btn > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 16px 28px !important; font-size: 16px !important; font-weight: 600 !important; width: 100% !important; }
 div[data-testid="stSelectbox"] > div, div[data-testid="stNumberInput"] > div > div, div[data-testid="stTextInput"] > div > div { background: #0a0a0f !important; border-color: #1e1e2e !important; color: #e2e8f0 !important; border-radius: 10px !important; }
 label { color: #64748b !important; font-size: 12px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; }
 footer { visibility: hidden; }
@@ -311,7 +312,9 @@ if not st.session_state.show_results:
             with col3:
                 outdoor = st.selectbox("Venue type", ["Indoors","Outdoors"]) == "Outdoors"
                 user_budget = st.number_input("Your budget (Rs.)", min_value=10000, max_value=100000000, value=500000, step=10000)
+            st.markdown('<div class="generate-btn">', unsafe_allow_html=True)
             submitted = st.form_submit_button("✦ Generate my event plan")
+            st.markdown('</div>', unsafe_allow_html=True)
 
         if submitted:
             with st.spinner("Our AI agents are planning your event..."):
