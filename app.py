@@ -37,6 +37,7 @@ st.markdown("""
 .chat-wrap { overflow: hidden; margin-bottom: 8px; }
 .chat-bot { background: #0a0a0f; border-left: 3px solid #7c3aed; border-radius: 0 12px 12px 12px; padding: 12px 16px; margin-bottom: 8px; color: #94a3b8; font-size: 13px; line-height: 1.6; max-width: 85%; clear: both; }
 .stButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 16px 28px !important; font-size: 16px !important; font-weight: 600 !important; width: 100% !important; }
+.stDownloadButton > button { background: linear-gradient(135deg, #7c3aed, #6d28d9) !important; color: white !important; border: none !important; border-radius: 12px !important; padding: 16px 28px !important; font-size: 16px !important; font-weight: 600 !important; width: 100% !important; }
 .reset-btn > button { background: #111118 !important; color: #94a3b8 !important; border: 1px solid #1e1e2e !important; border-radius: 12px !important; padding: 12px 28px !important; font-size: 14px !important; width: 100% !important; }
 div[data-testid="stSelectbox"] > div, div[data-testid="stNumberInput"] > div > div, div[data-testid="stTextInput"] > div > div { background: #0a0a0f !important; border-color: #1e1e2e !important; color: #e2e8f0 !important; border-radius: 10px !important; }
 label { color: #64748b !important; font-size: 12px !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; }
