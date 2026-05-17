@@ -27,7 +27,7 @@ Type something like _"I want to plan a wedding in Bangalore for 200 guests"_ and
 | Frontend | Streamlit |
 | ML Model | Scikit-learn (Random Forest Regressor) |
 | NLP Classifier | TF-IDF + Logistic Regression |
-| Knowledge Retrieval | FAISS + Sentence Transformers (RAG) |
+| Knowledge Retrieval | FAISS + Sentence Transformers (RAG) + Out-of-scope Detection |
 | Agent Orchestration | LangChain-style multi-agent pipeline |
 | PDF Export | ReportLab |
 | Deployment | Railway + Docker |
@@ -172,7 +172,10 @@ The system compares your budget against real Indian market rates per guest per c
 Supports 24 major Indian cities with realistic cost multipliers. Mumbai and Delhi are 40-50% more expensive than tier-2 cities like Patna or Kanpur.
 
 ### RAG-powered AI Assistant
-After generating your plan, you can ask follow-up questions. The assistant searches the FAISS knowledge base and returns the most relevant answers — no hallucination, only knowledge-base-backed responses.
+After generating your plan, you can ask follow-up questions about dress codes, food, decorations, photography, venues, and more. The assistant uses two layers of intelligence:
+- **Out-of-scope detection** — if a question is unrelated to event planning, it politely redirects instead of returning irrelevant results
+- **Extended knowledge base** — covers dress codes, food menus, decoration ideas, photography tips, venue selection, and music recommendations
+- **Dual search** — searches both the original FAISS index and an extended knowledge base, returning the 3 most relevant answers
 
 ---
 
@@ -192,6 +195,6 @@ After generating your plan, you can ask follow-up questions. The assistant searc
 
 ## Built By
 
-**Shreyas J ** — Internship Capstone Project
+**Shreyas J Rao** — Internship Capstone Project
 
 > Built from scratch over 6 weeks using Python, Scikit-learn, FAISS, Sentence Transformers, Streamlit, and Railway.
