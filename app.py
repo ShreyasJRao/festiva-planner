@@ -168,15 +168,99 @@ def generate_plan(event_type, city, guest_count, duration_days, season, outdoor,
         'tips': tips,
     }
 
+# ── EXTENDED KNOWLEDGE BASE ───────────────────────────────
+EXTENDED_KB = [
+    # Dress codes
+    "For a wedding guest, smart formal or traditional Indian wear like saree, lehenga, or sherwani is ideal. Avoid white or red as these are reserved for the bride.",
+    "For a corporate event, business formal attire is recommended — suits, blazers, or formal kurtas. Avoid casual wear like jeans and t-shirts.",
+    "For a birthday party, smart casual is the standard dress code. You can wear anything from jeans with a nice top to a casual dress depending on the venue.",
+    "For an anniversary celebration, semi-formal or cocktail attire works well. Opt for elegant but comfortable outfits in rich colors.",
+    "For a party, the dress code depends on the theme. For a casual house party, smart casual is fine. For a themed party, dress according to the theme.",
+    # Food & catering
+    "For Indian weddings, a typical menu includes welcome drinks, starters like paneer tikka and kebabs, main course with dal, rice, curries, and breads, and desserts like gulab jamun and ice cream.",
+    "For corporate events, a buffet with both vegetarian and non-vegetarian options is standard. Include light snacks, sandwiches, and beverages for breaks.",
+    "For birthday parties, finger foods, pizza, pasta, and a customized birthday cake are popular choices. For kids, include juice and soft drinks.",
+    "For outdoor events, choose foods that travel well and don't spoil quickly. Avoid mayonnaise-heavy dishes in summer.",
+    "Always ask guests about dietary preferences and allergies when sending invitations. Ensure at least 30% of the menu is vegetarian.",
+    # Decoration ideas
+    "For weddings, popular decoration themes include floral, fairy lights, royal, rustic, and beach themes. Marigold flowers are traditional for Indian weddings.",
+    "For birthday parties, balloon arches, photo booths, and themed backdrops are popular. LED lights and personalized banners add a special touch.",
+    "For corporate events, keep decorations minimal and professional. Use branded banners, floral centerpieces, and good lighting.",
+    "For anniversary parties, candles, rose petals, fairy lights, and a photo wall of memories make for a romantic setting.",
+    # Photography tips
+    "Book your photographer at least 6 months before a wedding. Review their portfolio and discuss shot lists beforehand.",
+    "For corporate events, a photographer who specializes in event photography will capture candid moments and formal group shots effectively.",
+    "Create a shot list for your event photographer including key moments, group photos, and candid shots you don't want to miss.",
+    # Venue tips
+    "When choosing a venue, consider capacity, parking, accessibility, catering options, and backup plans for rain if outdoors.",
+    "For weddings in Bangalore, popular areas include Indiranagar, Koramangala, and Whitefield. Book at least 12 months in advance for popular dates.",
+    "For corporate events, hotels with conference facilities offer AV equipment, catering, and technical support in one place.",
+    # Music & entertainment
+    "For weddings, a DJ with a mix of Bollywood, classical, and western music keeps guests entertained. Live bands are a premium option.",
+    "For birthday parties, create a playlist of the birthday person's favorite songs. For kids, include popular cartoon and movie songs.",
+    "For corporate events, background music during meals and networking sessions creates a pleasant atmosphere without being distracting.",
+    # General planning tips
+    "Always have a backup plan for outdoor events in case of rain. Rent a tent or have an indoor alternative ready.",
+    "Create a day-of timeline with 15-minute slots and share it with all vendors the week before the event.",
+    "Collect vendor contact numbers and have them saved on multiple phones on the day of the event.",
+    "Send a thank you note or gift to vendors who went above and beyond — it builds long-term relationships.",
+]
+
+# Event planning keywords for out-of-scope detection
+PLANNING_KEYWORDS = [
+    'plan', 'budget', 'venue', 'catering', 'food', 'decoration', 'decor',
+    'photographer', 'photography', 'music', 'dj', 'band', 'entertainment',
+    'invite', 'invitation', 'guest', 'checklist', 'timeline', 'schedule',
+    'vendor', 'book', 'hire', 'cost', 'price', 'theme', 'dress', 'wear',
+    'outfit', 'attire', 'clothes', 'menu', 'cake', 'flower', 'lighting',
+    'wedding', 'birthday', 'corporate', 'anniversary', 'party', 'event',
+    'tips', 'advice', 'organise', 'organize', 'arrange', 'setup', 'prepare',
+    'how', 'what', 'when', 'where', 'which', 'best', 'recommend'
+]
+
+def is_event_related(question):
+    question_lower = question.lower()
+    return any(keyword in question_lower for keyword in PLANNING_KEYWORDS)
+
 # ── AI ASSISTANT ──────────────────────────────────────────
 def ask_assistant(question, event_type=None):
     _, _, index, embed_model = load_models()
+
+    # Out-of-scope detection
+    if not is_event_related(question):
+        return "I am Festiva's event planning assistant. I can only help with questions related to event planning, budgets, venues, decorations, food, dress codes, photography, and other event-related topics. Please ask me something about your event!"
+
+    # Search both knowledge bases
+    combined_kb = KNOWLEDGE_BASE + EXTENDED_KB
     query = f"{event_type} {question}" if event_type else question
     query_vector = embed_model.encode([query])
-    distances, indices = index.search(np.array(query_vector), 3)
-    relevant = [KNOWLEDGE_BASE[i] for i in indices[0]]
+
+    # Search original FAISS index
+    distances, indices = index.search(np.array(query_vector), 2)
+    original_results = [(distances[0][i], KNOWLEDGE_BASE[indices[0][i]]) for i in range(len(indices[0]))]
+
+    # Search extended KB manually using embeddings
+    extended_vectors = embed_model.encode(EXTENDED_KB)
+    extended_scores = np.dot(extended_vectors, query_vector[0])
+    top_extended_idx = np.argsort(extended_scores)[::-1][:2]
+    extended_results = [(extended_scores[i], EXTENDED_KB[i]) for i in top_extended_idx]
+
+    # Pick best result from each source
+    all_results = original_results + extended_results
+    all_results.sort(key=lambda x: x[0])
+
+    # Take top 3 unique results
+    seen = set()
+    top_results = []
+    for score, text in all_results:
+        if text not in seen:
+            seen.add(text)
+            top_results.append(text)
+        if len(top_results) == 3:
+            break
+
     answer = "Based on event planning best practices:\n\n"
-    for i, tip in enumerate(relevant, 1):
+    for i, tip in enumerate(top_results, 1):
         answer += f"{i}. {tip}\n\n"
     return answer
 
